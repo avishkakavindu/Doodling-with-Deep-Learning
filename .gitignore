@@ -3,3 +3,8 @@ dataset/
 desktop.ini
 quick-draw-keras-cnn-model.ipynb
 raw/
+.idea/
+shuffled_csv/
+complete dataset/
+API/.idea/
+/API/doodle_api/db.sqlite3

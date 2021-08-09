@@ -8,3 +8,4 @@ shuffled_csv/
 complete dataset/
 API/.idea/
 /API/doodle_api/db.sqlite3
+quiz_csvs/

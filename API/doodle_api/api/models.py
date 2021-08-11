@@ -54,6 +54,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
 
+
+
 class Quiz(models.Model):
     """ Quiz model - stores quiz data """
 
@@ -77,7 +79,7 @@ class UserQuiz(models.Model):
 class QuizQuestion(models.Model):
     """ QuizQuestion model - stores questions that belongs to a quiz"""
 
-    quiz = models.ForeignKey(Quiz, null=False, blank=False, on_delete=models.CASCADE)
+    quiz = models.ForeignKey(Quiz, null=False, blank=False, on_delete=models.CASCADE, related_name='question_set')
     question = models.CharField(max_length=255)
     image = models.ImageField(upload_to='quiz_images/', null=True, blank=True)
     dummy_answer1 = models.CharField(max_length=255)

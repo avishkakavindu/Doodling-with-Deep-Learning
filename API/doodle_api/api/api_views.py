@@ -1,4 +1,5 @@
 import requests
+from django.http import Http404
 from rest_framework.parsers import FileUploadParser, MultiPartParser, FormParser
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -6,6 +7,10 @@ from rest_framework import status
 from rest_framework import authentication, permissions
 from rest_framework_simplejwt.authentication import JWTTokenUserAuthentication
 from api.models import QuizQuestion, Quiz
+from rest_framework import generics
+from api.permissions import IsStaff
+
+from api.serializers import QuizQuestionSerializer
 
 
 class UserActivationView(APIView):
@@ -30,14 +35,29 @@ class UserActivationView(APIView):
 
 
 class QuizCSVImportAPIView(APIView):
+    """
+        Populate quiz questions using csv data by calling 'api/upload_csv/'
+     """
+
     authentication_classes = [JWTTokenUserAuthentication]
-    # permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsStaff]
 
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
         file_obj = request.FILES['file']
-        quiz = Quiz.objects.get(name=request.data.get('quiz'))
+        try:
+            quiz = Quiz.objects.get(name=request.data.get('quiz'))
+        except Quiz.DoesNotExist:
+            quizes = Quiz.objects.values_list('name', flat=True)
+
+            context = {
+                'detail': 'Invalid Quiz Type!',
+                'quiz_types': quizes
+            }
+
+            return Response(context, status=status.HTTP_400_BAD_REQUEST)
+
         import pandas as pd
 
         df = pd.read_csv(file_obj)
@@ -54,5 +74,45 @@ class QuizCSVImportAPIView(APIView):
             ) for row in df.itertuples()]
         QuizQuestion.objects.bulk_create(model_instances)
 
-
         return Response({'detail': 'File uploaded successfully!'}, status=status.HTTP_201_CREATED)
+
+
+# class QuizQuestionRetrieveAPIView(generics.RetrieveAPIView):
+#     """
+#
+#     """
+#
+#     authentication_classes = [JWTTokenUserAuthentication]
+#     permission_classes = [permissions.IsAuthenticated]
+#
+#     serializer_class = QuizSerializer
+#     queryset = Quiz.objects.all().order_by('?')
+#     lookup_field = 'name'
+
+
+class QuizQuestionAPIView(APIView):
+    """ QuezQuestionAPIView - Retrieve 10 questions for a quiz """
+
+    authentication_classes = [JWTTokenUserAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = QuizQuestionSerializer
+
+    def get_object(self, name):
+        try:
+            return Quiz.objects.get(name=name)
+        except Quiz.DoesNotExist:
+            raise Http404
+
+    def get(self, request, name, format=None):
+        """
+            Return a 10 questions.
+        """
+
+        questions = QuizQuestion.objects.filter(
+            quiz=self.get_object(name)
+        ).order_by('?')[:10]
+        questions_serialized = QuizQuestionSerializer(questions, many=True)
+
+        return Response(questions_serialized.data)
+
+

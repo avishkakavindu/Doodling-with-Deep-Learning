@@ -1,3 +1,4 @@
+from datetime import datetime
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -7,22 +8,22 @@ from django.db import models
 class UserAccountManager(BaseUserManager):
     """ UserAccountManager - handles actions of User model """
 
-    def create_user(self, username, email, password=None):
+    def create_user(self, username, email, password=None, **kwargs):
         if username is None:
             raise TypeError('User need to have username!')
         if email is None:
             raise TypeError('User need to have Email!')
 
-        user = self.model(username=username, email=self.normalize_email(email))
+        user = self.model(username=username, email=self.normalize_email(email), **kwargs)
         user.set_password(password)
         user.save()
         return user
 
-    def create_superuser(self, username, email, password):
+    def create_superuser(self, username, email, password, **kwargs):
         if password is None:
             raise TypeError("Password shouldn't be None!")
 
-        user = self.create_user(username, email, password)
+        user = self.create_user(username, email, password, **kwargs)
         user.is_superuser = True
         user.is_staff = True
         user.save()
@@ -54,8 +55,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
 
-
-
 class Quiz(models.Model):
     """ Quiz model - stores quiz data """
 
@@ -65,12 +64,13 @@ class Quiz(models.Model):
         return self.name
 
 
-class UserQuiz(models.Model):
+class UserQuizMark(models.Model):
     """ UserQuiz model - the pivot table of Quiz and User models """
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE)
     marks = models.IntegerField(validators=[MinValueValidator(0), MaxValueValidator(10)])
+    timestamp = models.DateTimeField(default=datetime.now())
 
     def __str__(self):
         return '{} - {}'.format(self.user, self.quiz)

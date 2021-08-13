@@ -1,7 +1,7 @@
 from rest_framework import serializers, status
 from djoser.serializers import UserCreateSerializer
 from django.contrib.auth import get_user_model
-from api.models import Quiz, QuizQuestion
+from api.models import Quiz, QuizQuestion, UserQuizMark
 import numpy as np
 
 User = get_user_model()
@@ -43,3 +43,14 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
 #             representation['questions'], 3, replace=False)
 #
 #         return representation
+
+
+class QuizMarksSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(required=True, queryset=User.objects.all())
+    quiz = serializers.PrimaryKeyRelatedField(required=True, queryset=Quiz.objects.all())
+    marks = serializers.FloatField(min_value=0, max_value=1)
+
+    class Meta:
+        model = UserQuizMark
+        fields = '__all__'
+

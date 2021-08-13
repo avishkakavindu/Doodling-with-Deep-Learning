@@ -1,5 +1,5 @@
 from django.contrib import admin
-from api.models import User, Quiz, QuizQuestion, UserQuiz
+from api.models import User, Quiz, QuizQuestion, UserQuizMark
 
 
 @admin.register(User)
@@ -22,8 +22,8 @@ class QuizQuestion(admin.ModelAdmin):
     list_filter = ['quiz']
 
 
-@admin.register(UserQuiz)
-class UserQuizAdmin(admin.ModelAdmin):
+@admin.register(UserQuizMark)
+class UserQuizMarkAdmin(admin.ModelAdmin):
     list_display = ['id', 'quiz', 'marks']
     search_fields = ['user', 'quiz', 'question']
     list_filter = ['quiz']

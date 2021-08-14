@@ -179,22 +179,41 @@ class ScoreAPIView(APIView):
         except Quiz.DoesNotExist:
             raise Http404
 
-    def get_iq_subject_score(self, user):
-        """ Get average score for Iq and Subject """
-
+    def get_queryset(self, user, quiz):
         try:
-            iq_score = UserQuizMark.objects.filter(user=user, quiz=self.get_object('iq')).latest('timestamp').marks
-            math_score = UserQuizMark.objects.filter(user=user, quiz=self.get_object('math')).latest('timestamp').marks
-            english_score = UserQuizMark.objects.filter(user=user, quiz=self.get_object('english')).latest('timestamp').marks
+            obj = UserQuizMark.objects.filter(user=user, quiz=quiz).order_by('timestamp').reverse()[:2]
         except UserQuizMark.DoesNotExist:
             raise Http404
 
-        return (iq_score + math_score + english_score)/3
+        return obj
 
     def get_overall_score(self, user):
+        """ Get average score for Iq and Subject quizzes """
+
+        quizzes = ['iq', 'math', 'english']
+
+        prev_scores = []
+        new_scores = []
+
+        for quiz in quizzes:
+            quiz_obj = self.get_object(quiz)
+            queryset = self.get_queryset(user, quiz_obj)
+
+            try:
+                new_scores.append(queryset[0].marks)
+                prev_scores.append(queryset[1].marks)
+            except:
+                new_scores.append(queryset[0].marks)
+                prev_scores.append(0)
+
+        import statistics
+
+        return statistics.mean(prev_scores), statistics.mean(new_scores)
+
+    def get_final_score(self, user):
         """ Get overall score for Iq, subject, speech and draw quiz """
 
-        iq_subject_score = self.get_iq_subject_score
+        iq_subject_score = self.get_overall_score(user=user)
 
         try:
             speech_score = UserQuizMark.objects.filter(user=user, quiz=self.get_object('speech_training')).latest('timestamp').marks
@@ -209,21 +228,22 @@ class ScoreAPIView(APIView):
     def get(self, request, *args, **kwargs):
         """
             Returns the average score for iq, maths english
-            /quiz_performance/iq_subject_score/ - endpoint to get average score for Iq and Subject quizzes
-            /quiz_performance/overall_score/    - endpoint to get average score for
+            /quiz_performance/overall_score/ - endpoint to get average score for Iq and Subject quizzes
+            /quiz_performance/final_score/    - endpoint to get final average score
         """
 
-        if kwargs['slug'] == 'iq_subject_score':
-            score = self.get_iq_subject_score(user=request.user.id)
+        # if the requested is average of  iq and subject related quiz marks
+        if kwargs['slug'] == 'overall_score':
+            prev_score, new_score = self.get_overall_score(request.user.id)
 
-            if score >= 9:
+            if new_score >= 9:
                 detail = "Your child's performance is very good. You're very lucky to have such a child"
                 grade = 'Skillful'
-            elif score >= 7:
+            elif new_score >= 7:
                 detail = 'Your child have average performance parents can encourage to child for performance even ' \
                          'better '
                 grade = 'Developing'
-            elif score >= 5:
+            elif new_score >= 5:
                 detail = "Better than ineffective but parents still need to focus on child's education"
                 grade = 'Minimally Effective'
             else:
@@ -233,7 +253,25 @@ class ScoreAPIView(APIView):
             context = {
                 'detail': detail,
                 'grade': grade,
-                'score': score,
+                'score': new_score,
+                'progress': '{}%'.format(new_score - prev_score)
             }
+
+        elif kwargs['slug'] == 'final_score':
+            score = self.get_final_score(user=request.user.id)
+
+            context = {
+                'detail': {
+                    'previous_score': self.get_overall_score(user=request.user.id),
+                    'current_score': {
+                        'score': self.get_final_score(user=request.user.id),
+                        
+                    }
+                }
+            }
+
+
+
+
 
         return Response(context)

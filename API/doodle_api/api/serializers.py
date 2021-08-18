@@ -1,7 +1,7 @@
 from rest_framework import serializers, status
 from djoser.serializers import UserCreateSerializer
 from django.contrib.auth import get_user_model
-from api.models import Quiz, QuizQuestion, UserQuizMark
+from api.models import Quiz, QuizQuestion, UserQuizMark, Sketch
 import numpy as np
 
 User = get_user_model()
@@ -52,5 +52,14 @@ class QuizMarksSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserQuizMark
+        fields = '__all__'
+
+
+class SketchSerializer(serializers.ModelSerializer):
+    image = serializers.ImageField(read_only=True)
+    name = serializers.CharField(read_only=True)
+    
+    class Meta:
+        model = Sketch
         fields = '__all__'
 

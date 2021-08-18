@@ -1,3 +1,6 @@
+import os
+import tensorflow as tf
+import keras
 import requests
 from django.http import Http404
 from rest_framework.parsers import FileUploadParser, MultiPartParser, FormParser
@@ -6,12 +9,14 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework import authentication, permissions
 from rest_framework_simplejwt.authentication import JWTTokenUserAuthentication
-from api.models import QuizQuestion, Quiz, UserQuizMark
+from api.models import QuizQuestion, Quiz, UserQuizMark, Sketch, DrawnSketch
 from rest_framework import generics
 from api.permissions import IsStaff
-
-from api.serializers import QuizQuestionSerializer, QuizMarksSerializer
+import cv2
+import numpy as np
+from api.serializers import QuizQuestionSerializer, QuizMarksSerializer, SketchSerializer
 from api.models import User
+from django.conf import settings
 
 
 class UserActivationView(APIView):
@@ -216,14 +221,16 @@ class ScoreAPIView(APIView):
         iq_subject_score = self.get_overall_score(user=user)
 
         try:
-            speech_score = UserQuizMark.objects.filter(user=user, quiz=self.get_object('speech_training')).latest('timestamp').marks
-            drawing_score = UserQuizMark.objects.filter(user=user, quiz=self.get_object('drawing')).latet('timestamp').marks
+            speech_score = UserQuizMark.objects.filter(user=user, quiz=self.get_object('speech_training')).latest(
+                'timestamp').marks
+            drawing_score = UserQuizMark.objects.filter(user=user, quiz=self.get_object('drawing')).latet(
+                'timestamp').marks
         except UserQuizMark.DoesNotExist:
             raise Http404
 
         avg_speech_drawing_score = speech_score + drawing_score
 
-        return (iq_subject_score + avg_speech_drawing_score)/2
+        return (iq_subject_score + avg_speech_drawing_score) / 2
 
     def get(self, request, *args, **kwargs):
         """
@@ -265,13 +272,65 @@ class ScoreAPIView(APIView):
                     'previous_score': self.get_overall_score(user=request.user.id),
                     'current_score': {
                         'score': self.get_final_score(user=request.user.id),
-                        
+
                     }
                 }
             }
 
-
-
-
-
         return Response(context)
+
+
+class GetSketchAPIView(APIView):
+    """ GetSketchAPIView - returns random image to draw """
+
+    def get_object(self):
+        return Sketch.objects.order_by('?')[0]
+
+    def get(self, request, format=None):
+        serializer = SketchSerializer(self.get_object())
+        return Response(serializer.data)
+
+
+class PredictAPIView(APIView):
+    """ PredictAPIView - returns predictions for the given sketch """
+
+    def get_object(self, **kwargs):
+        try:
+            obj = Sketch.objects.get(**kwargs)
+        except Sketch.DoesNotExist:
+            raise Http404
+        return obj
+
+    def get_processed_input_img(self, image_path, size=64):
+        """ Preprocess user input image to feed to the model """
+
+        image_path = os.path.join(settings.MEDIA_ROOT, image_path)
+        test_img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+
+        test_img = cv2.resize(test_img, dsize=(64, 64), interpolation=cv2.INTER_CUBIC)
+        thresh = 250
+        test_img = cv2.threshold(test_img, thresh, 255, cv2.THRESH_BINARY)[1]
+        test_img = test_img.reshape((1, size, size, 1)).astype(np.float32)
+
+        return test_img
+
+    def f1(self, y_true, y_pred):
+        return 1
+
+    def post(self, request, format=None):
+        sketch_name = self.get_object(id=request.POST['sketch_id'])
+        image = request.FILES['image']
+
+        user = User.objects.get(id=1)
+
+        sketch_obj = DrawnSketch.objects.create(user=user, image=request.FILES['image'], image_name=sketch_name)
+        path = str(sketch_obj.image.name)
+        sketch = self.get_processed_input_img(path)
+
+        reconstructed_model = keras.models.load_model('static/model', compile=False)
+        pred = reconstructed_model.predict(sketch)
+        top_3 = np.argsort(-pred)[:, 0:3]
+
+        categories = ['airplane', 'ant', 'bee', 'bird']
+
+        return Response({'predictions': pred, 'pred':  [categories[i] for i in top_3.ravel()]})

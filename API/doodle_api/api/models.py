@@ -89,3 +89,24 @@ class QuizQuestion(models.Model):
     def __str__(self):
         return 'Question{}'.format(self.quiz, self.question)
 
+
+class Sketch(models.Model):
+    """ Sketch model - stores sketch pictures that need to draw """
+
+    image = models.ImageField(upload_to='quiz_images')
+    name = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.name
+
+
+class DrawnSketch(models.Model):
+    """ DrawnSketch model - stores sketches drawn by the user """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    marks = models.ForeignKey(UserQuizMark, on_delete=models.CASCADE, null=True, blank=True)
+    image = models.ImageField(upload_to='sketches')
+    image_name = models.ForeignKey(Sketch, on_delete=models.CASCADE)
+    
+    def __str__(self):
+        return '{}-{}'.format(self.user, self.image_name)

@@ -9,3 +9,8 @@ complete dataset/
 API/.idea/
 /API/doodle_api/db.sqlite3
 quiz_csvs/
+
+/API/doodle_api/static/model/doodle_cnn/assets/
+/API/doodle_api/static/model/doodle_cnn/variables/
+/API/doodle_api/static/model/doodle_cnn/keras_metadata.pb
+/API/doodle_api/static/model/doodle_cnn/saved_model.pb

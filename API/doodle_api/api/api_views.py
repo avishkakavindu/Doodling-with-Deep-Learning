@@ -310,15 +310,20 @@ class PredictAPIView(APIView):
         test_img = cv2.resize(test_img, dsize=(64, 64), interpolation=cv2.INTER_CUBIC)
         thresh = 250
         test_img = cv2.threshold(test_img, thresh, 255, cv2.THRESH_BINARY)[1]
-        test_img = test_img.reshape((1, size, size, 1)).astype(np.float32)
+        test_img = test_img.reshape((1, size, size, 1)).astype(np.float32)/255
 
+        print(test_img)
         return test_img
 
-    def f1(self, y_true, y_pred):
-        return 1
+    def save_drawing_score(self, user, quiz, marks):
+        """ Stores the marks for a quiz """
+
+        obj = UserQuizMark.objects.create(user=user, quiz=quiz, marks=marks*10)
+        return obj
 
     def post(self, request, format=None):
         sketch_name = self.get_object(id=request.POST['sketch_id'])
+
         image = request.FILES['image']
 
         user = User.objects.get(id=1)
@@ -327,10 +332,40 @@ class PredictAPIView(APIView):
         path = str(sketch_obj.image.name)
         sketch = self.get_processed_input_img(path)
 
-        reconstructed_model = keras.models.load_model('static/model', compile=False)
+        reconstructed_model = keras.models.load_model('static/model/doodle_cnn/model.h5', compile=False)
         pred = reconstructed_model.predict(sketch)
-        top_3 = np.argsort(-pred)[:, 0:3]
+        # print('\n\n\npredictions: ',  reconstructed_model.predict_proba(sketch))
+        top_3 = np.argsort(-pred)[:, 0:3].ravel()
 
-        categories = ['airplane', 'ant', 'bee', 'bird']
+        print('\n\n\n\n\nTop 3: ', top_3, '\n\n ravel:', top_3.ravel())
 
-        return Response({'predictions': pred, 'pred':  [categories[i] for i in top_3.ravel()]})
+        # categories = ['airplane', 'apple', 'bus', 'flower', 'pineapple']
+        # categories = ['airplane', 'alarm clock', 'ant', 'apple', 'bus', 'dog', 'face', 'fish', 'flower', 'ice cream']
+        categories = ['airplane', 'ant', 'apple', 'bus', 'face', 'fish', 'guitar', 'scissors', 'sun', 't-shirt']
+
+        sketch_index = categories.index(sketch_name.name.lower())
+
+        print('\n\n\n', sketch_index)
+
+        if sketch_index == top_3[0]:
+            score = 0.8
+            similarity = 'Similarity above 80%'
+        elif sketch_index == top_3[1]:
+            score = 0.6
+            similarity = 'Similarity above 60%'
+        elif sketch_index == top_3[2]:
+            score = 0.4
+            similarity = 'Similarity above 40%'
+        else:
+            score = 0.2
+            similarity = 'Similarity bellow 40%'
+
+        # save record
+        self.save_drawing_score(user, Quiz.objects.get(name='drawing'), score)
+
+        context = {
+            'score': score,
+            'detail': similarity
+        }
+
+        return Response(context, status=status.HTTP_201_CREATED)
